@@ -2,6 +2,33 @@
 
 const BOXES_WITH_CHILDREN = ["moof", "traf"];
 
+class XMLImageDecoder {
+
+  constructor(rawXml) {
+    if (window.DOMParser) {
+      const parser = new DOMParser();
+      this.xml = parser.parseFromString(rawXml, "text/xml");
+    } else {
+      console.error("No XML parser found");
+    }
+  }
+
+  decodeImages() {
+    if (this.xml) {
+      const images = this.xml.getElementsByTagName("smpte:image");
+      for (let image of images) {
+        if (image.getAttribute("encoding") === "Base64") {
+          const encoded = image.childNodes[0].nodeValue;
+          const imgElement = document.createElement("img");
+          imgElement.className = "imgFromXml";
+          imgElement.src = `data:image/png;base64, ${encoded}`;
+          document.body.appendChild(imgElement);
+        }
+      }
+    }
+  }
+}
+
 class ISOAnalyzer {
 
   constructor(buffer) {
@@ -16,8 +43,10 @@ class ISOAnalyzer {
       console.log(`Found box of type ${name} and size ${size}`);
       
       if (name === "mdat") {
-        const xml = this.getData(size - 8);
-        console.log(this.uint8ArrayToString(xml));
+        const xml = this.uint8ArrayToString(this.getData(size - 8));
+        console.log(`Content of mdat box is: ${xml}`);
+        const xmlDecoder = new XMLImageDecoder(xml);
+        xmlDecoder.decodeImages();
       } else if (BOXES_WITH_CHILDREN.indexOf(name) === -1) {
         this.offset += size - 8;
       }
