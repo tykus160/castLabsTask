@@ -1,6 +1,9 @@
 "use strict";
 
 const BOXES_WITH_CHILDREN = ["moof", "traf"];
+const SIZE_BYTES = 4;
+const NAME_BYTES = 4;
+const BOX_BYTES = SIZE_BYTES + NAME_BYTES;
 
 class XMLImageDecoder {
 
@@ -20,7 +23,6 @@ class XMLImageDecoder {
         if (image.getAttribute("encoding") === "Base64") {
           const encoded = image.childNodes[0].nodeValue;
           const imgElement = document.createElement("img");
-          imgElement.className = "imgFromXml";
           imgElement.src = `data:image/png;base64, ${encoded}`;
           document.body.appendChild(imgElement);
         }
@@ -28,6 +30,9 @@ class XMLImageDecoder {
     }
   }
 }
+
+// The first four bytes (bytes 0-3) specify the size (or length) of the box.
+// Bytes 4-7 specify the type of the box.
 
 class ISOAnalyzer {
 
@@ -37,28 +42,34 @@ class ISOAnalyzer {
   }
 
   analyze() {
+    const logger = document.getElementById("logger");
+    let msg;
     while (this.offset < this.buffer.byteLength) {
       const size = this.getBoxSize();
       const name = this.getBoxName();
-      console.log(`Found box of type ${name} and size ${size}`);
+      msg = `Found box of type ${name} and size ${size}`;
+      logger.value += `${msg}\n`;
+      console.log(msg);
       
       if (name === "mdat") {
-        const xml = this.uint8ArrayToString(this.getData(size - 8));
-        console.log(`Content of mdat box is: ${xml}`);
+        const xml = this.uint8ArrayToString(this.getData(size - BOX_BYTES));
+        msg = `Content of mdat box is: ${xml}`;
+        logger.value += `${msg}\n`;
+        console.log(msg);
         const xmlDecoder = new XMLImageDecoder(xml);
         xmlDecoder.decodeImages();
       } else if (BOXES_WITH_CHILDREN.indexOf(name) === -1) {
-        this.offset += size - 8;
+        this.offset += size - BOX_BYTES;
       }
     }
   }
 
   getBoxName() {
-    return this.uint8ArrayToString(this.getData(4));
+    return this.uint8ArrayToString(this.getData(NAME_BYTES));
   }
 
   getBoxSize() {
-    return this.uint8ArrayToInt(this.getData(4));
+    return this.uint8ArrayToInt(this.getData(SIZE_BYTES));
   }
 
   getData(size) {
@@ -82,6 +93,25 @@ class ISOAnalyzer {
 
 function downloadISO(uri) {
   return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", uri);
+    xhr.responseType = "blob";
+    xhr.addEventListener("error", () => {
+      reject("error");
+    });
+    xhr.addEventListener("load", () => {
+      if (xhr.status === 200) {
+        resolve(xhr.response);
+      } else {
+        reject(xhr.statusText);
+      }
+    });
+    xhr.send();
+  });
+}
+
+function readISO(uri) {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("error", () => {
       reject("error");
@@ -93,17 +123,18 @@ function downloadISO(uri) {
   });
 }
 
-
-
-// The first four bytes (bytes 0­3) specify the size (or length) of the box.
-// Bytes 4­7 specify the type of the box.
-
-async function analyzeISO(e) {
-  const response = await downloadISO(e.target.files[0]);
+async function analyzeISO(uri) {
+  let response;
+  if (typeof(uri) === "string") {
+    response = await downloadISO(uri);
+  }
+  if (response) {
+    response = await readISO(response);
+  }
   if (response instanceof ArrayBuffer) {
     const analyzer = new ISOAnalyzer(response);
     analyzer.analyze();
   }
 }
 
-document.getElementById("isoFile").addEventListener("change", analyzeISO);
+analyzeISO("https://demo.castlabs.com/tmp/text0.mp4");
