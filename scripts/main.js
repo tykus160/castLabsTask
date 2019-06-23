@@ -8,17 +8,31 @@ const BOX_BYTES = SIZE_BYTES + NAME_BYTES;
 class XMLImageDecoder {
 
   constructor(rawXml) {
-    if (window.DOMParser) {
-      const parser = new DOMParser();
-      this.xml = parser.parseFromString(rawXml, "text/xml");
-    } else {
-      console.error("No XML parser found");
+    try {
+      if (window.DOMParser && typeof rawXml === "string") {
+        const parser = new DOMParser();
+        this.xml = parser.parseFromString(rawXml, "text/xml");
+      }
+    } catch (err) {
+      // intentionally empty
     }
+    if (!this.xml) {
+      console.error("No DOM Parser found or input string broken");
+    }
+  }
+
+  getSMPTENamespace() {
+    let result = null;
+    if (this.xml) {
+      const tt = this.xml.getElementsByTagName("tt");
+      result = tt && tt.length > 0 && tt[0] && tt[0].getAttribute("xmlns:smpte");
+    }
+    return result;
   }
 
   decodeImages() {
     if (this.xml) {
-      const images = this.xml.getElementsByTagName("smpte:image");
+      const images = this.xml.getElementsByTagNameNS(this.getSMPTENamespace(), "image");
       for (let image of images) {
         if (image.getAttribute("encoding") === "Base64") {
           const encoded = image.childNodes[0].nodeValue;
@@ -42,20 +56,13 @@ class ISOAnalyzer {
   }
 
   analyze() {
-    const logger = document.getElementById("logger");
-    let msg;
     while (this.offset < this.buffer.byteLength) {
       const size = this.getBoxSize();
       const name = this.getBoxName();
-      msg = `Found box of type ${name} and size ${size}`;
-      logger.value += `${msg}\n`;
-      console.log(msg);
-      
+      console.log(`Found box of type ${name} and size ${size}`);
       if (name === "mdat") {
         const xml = this.uint8ArrayToString(this.getData(size - BOX_BYTES));
-        msg = `Content of mdat box is: ${xml}`;
-        logger.value += `${msg}\n`;
-        console.log(msg);
+        console.log( `Content of mdat box is: ${xml}`);
         const xmlDecoder = new XMLImageDecoder(xml);
         xmlDecoder.decodeImages();
       } else if (BOXES_WITH_CHILDREN.indexOf(name) === -1) {
@@ -125,11 +132,20 @@ function readISO(uri) {
 
 async function analyzeISO(uri) {
   let response;
-  if (typeof(uri) === "string") {
-    response = await downloadISO(uri);
+  if (typeof uri === "string") {
+    try {
+      response = await downloadISO(uri);
+    } catch (err) {
+      console.error(err);
+    }
   }
   if (response) {
-    response = await readISO(response);
+    console.log(`Successfully loaded file ${uri}`);
+    try {
+      response = await readISO(response);
+    } catch (err) {
+      console.error(err);
+    }
   }
   if (response instanceof ArrayBuffer) {
     const analyzer = new ISOAnalyzer(response);
