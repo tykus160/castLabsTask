@@ -1,5 +1,5 @@
 # castLabs recruitment task
-## by Wojciech Tyczyński (tyczynskiwojciech@gmail.com), June 2019
+## by Wojciech Tyczyński, June 2019
 
 Solution based on vanilla ES8 Javascript. Tested on:
 
