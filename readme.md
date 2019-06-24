@@ -9,6 +9,7 @@ Solution based on vanilla ES8 Javascript. Tested on:
 | Google Chrome     | 75.0.3770.100  | &#9745; |
 | Microsoft Edge    | 44.18362.1.0   | &#9745; |
 | Internet Explorer | 11.175.18362.0 | &#9744; |
+| Safari            | 12.1.1         | &#9745; |
 
 Does not work on latest installment of Internet Explorer 11 due to really weak ES6 support.
 
